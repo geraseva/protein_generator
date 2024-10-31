@@ -434,8 +434,8 @@ class IterativeSimulator(nn.Module):
         T_s = list()
         alpha_s = list()
         for i_m in range(self.n_extra_block):
-            R_in = R_in.detach() # detach rotation (for stability)
-            T_in = T_in.detach()
+            R_in = R_in
+            T_in = T_in
             # Get current BB structure
             xyz = einsum('bnij,bnaj->bnai', R_in, xyz_in) + T_in.unsqueeze(-2)
 
@@ -447,8 +447,8 @@ class IterativeSimulator(nn.Module):
             alpha_s.append(alpha)
 
         for i_m in range(self.n_main_block):
-            R_in = R_in.detach()
-            T_in = T_in.detach()
+            R_in = R_in
+            T_in = T_in
             # Get current BB structure
             xyz = einsum('bnij,bnaj->bnai', R_in, xyz_in) + T_in.unsqueeze(-2)
             
@@ -461,8 +461,8 @@ class IterativeSimulator(nn.Module):
        
         state = self.proj_state2(state)
         for i_m in range(self.n_ref_block):
-            R_in = R_in.detach()
-            T_in = T_in.detach()
+            R_in = R_in
+            T_in = T_in
             xyz = einsum('bnij,bnaj->bnai', R_in, xyz_in) + T_in.unsqueeze(-2)
             R_in, T_in, state, alpha = self.str_refiner(msa, pair, R_in, T_in, xyz, state, idx, top_k=64)
             R_s.append(R_in)

@@ -24,7 +24,31 @@ conversion = 'ARNDCQEGHILKMFPSTWYVX-'
 
 # TEMPLATE CLASS
 class Potential:
-    
+    def __init__(self): 
+        self.model=None  
+
+    def predict_structure(self, seq):
+
+        msa_masked=self.features['msa_masked'].clone().detach()
+        msa_full=self.features['msa_full'].clone().detach()
+        msa_masked[0,0,0,:,:21] = seq
+        msa_masked[0,0,0,:,22:43] = seq
+        msa_full[0,0,0,:,:21] = seq
+        in_seq = torch.argmax(seq, dim=-1)[None,None]
+
+
+        _, _, xyz, _, _ = self.model(msa_masked[:,0], 
+                                     msa_full[:,0], 
+                                     in_seq[:,0],
+                                     self.features['xyz_prev'], 
+                                     self.features['idx_pdb'], 
+                                     t1d=self.features['t1d'], 
+                                     t2d=self.features['t2d'],
+                                     xyz_t=self.features['xyz_t'], 
+                                     alpha_t=self.features['alpha_t'],
+                                     return_raw=True)
+        return xyz
+
     def get_gradients(seq):
         '''
             EVERY POTENTIAL CLASS MUST RETURN GRADIENTS
@@ -43,7 +67,9 @@ class AACompositionalBias(Potential):
     
     """
 
-    def __init__(self, args, features, potential_scale, DEVICE): 
+    def __init__(self, args, features, potential_scale, DEVICE, model=None): 
+
+        super().__init__()
         
         self.L = features['L']
         self.DEVICE = DEVICE
@@ -191,8 +217,9 @@ class HydrophobicBias(Potential):
     noise = type of ditribution to sample from; DEFAULT - normal_gaussian
     
     """    
-    def __init__(self, args, features, potential_scale, DEVICE):
+    def __init__(self, args, features, potential_scale, DEVICE, model=None):
         
+        super().__init__()
         self.target_score = args['hydrophobic_score']
         self.potential_scale = potential_scale
         self.loss_type = args['hydrophobic_loss_type']
@@ -282,8 +309,9 @@ class ChargeBias(Potential):
     noise = type of ditribution to sample from; DEFAULT - normal_gaussian
     
     """        
-    def __init__(self, args, features, potential_scale, DEVICE):
+    def __init__(self, args, features, potential_scale, DEVICE, model=None):
 
+        super().__init__()
         self.target_charge = args['target_charge']
         self.pH = args['target_pH']
         self.loss_type = args['charge_loss_type']
@@ -674,8 +702,9 @@ class ChargeBias(Potential):
 
 class PSSMbias(Potential):
 
-    def __init__(self, args, features, potential_scale, DEVICE):
+    def __init__(self, args, features, potential_scale, DEVICE, model=None):
 
+        super().__init__()
         self.features = features
         self.args = args
         self.potential_scale = potential_scale
@@ -689,6 +718,52 @@ class PSSMbias(Potential):
 
         return self.PSSM*self.potential_scale
 
+class monomer_ROG(Potential):
+    '''
+        Radius of Gyration potential for encouraging monomer compactness
+
+        Written by DJ and refactored into a class by NRB
+    '''
+
+    def __init__(self, args, features, potential_scale, DEVICE, model, min_dist=15):
+
+        super().__init__()
+
+        self.features = features
+        for key in features:
+            try:
+                features[key].requires_grad_(False)
+            except:
+                pass
+        self.args = args
+
+        self.min_dist = min_dist
+        self.potential_scale = potential_scale
+        self.DEVICE = DEVICE
+        self.model=model
+        self.model.eval()
+
+    def get_gradients(self, seq):
+
+        seq=seq.clone().detach().requires_grad_(True)
+
+        xyz=self.predict_structure(seq)
+
+        Ca = xyz[0,:,1,:] # [L,3]
+        centroid = torch.mean(Ca, dim=0, keepdim=True) # [1,3]
+        dgram = torch.cdist(Ca[None,...].contiguous(), centroid[None,...].contiguous(), p=2) # [1,L,1,3]
+        dgram = torch.maximum(self.min_dist * torch.ones_like(dgram.squeeze(0)), dgram.squeeze(0)) # [L,1,3]
+        rad_of_gyration = torch.sqrt( torch.sum(torch.square(dgram)) / Ca.shape[0] ) # [1]
+        rad_of_gyration.backward()  
+
+        # Get gradients from msa_masked
+        self.gradients = seq.grad
+
+        # reset gradient
+        seq.grad=None
+
+        return -self.gradients*self.potential_scale
 
 ### ADD NEW POTENTIALS INTO LIST DOWN BELOW ###
-POTENTIALS = {'aa_bias':AACompositionalBias, 'charge':ChargeBias, 'hydrophobic':HydrophobicBias, 'PSSM':PSSMbias}
+POTENTIALS = {'aa_bias':AACompositionalBias, 'charge':ChargeBias, 'hydrophobic':HydrophobicBias, 'PSSM':PSSMbias, 
+              'monomer_ROG':monomer_ROG}

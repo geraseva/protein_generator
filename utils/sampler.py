@@ -548,7 +548,7 @@ class SEQDIFF_sampler:
             assert p in POTENTIALS.keys(), \
                 f'The potential specified: {p} , does not match into POTENTIALS dictionary in potentials.py'
             print(f'Using potential: {p}')
-            self.potential_list.append(POTENTIALS[p](self.args, self.features, s, self.DEVICE))
+            self.potential_list.append(POTENTIALS[p](self.args, self.features, s, self.DEVICE, self.model))
         
         self.use_potentials = True
         
@@ -1633,3 +1633,4 @@ class grad_test_SAMPLER(SEQDIFF_sampler):
         self.features['msa_prev'],
         self.features['pair_prev'],
         self.features['state_prev'])
+    
