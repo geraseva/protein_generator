@@ -718,6 +718,7 @@ class PSSMbias(Potential):
 
         return self.PSSM*self.potential_scale
 
+## trying to add any structure-based potential
 class monomer_ROG(Potential):
     '''
         Radius of Gyration potential for encouraging monomer compactness
@@ -764,6 +765,64 @@ class monomer_ROG(Potential):
 
         return -self.gradients*self.potential_scale
 
+
+class dmasif_interactions(Potential):
+
+
+    def __init__(self, args, features, potential_scale, DEVICE, model):
+
+        super().__init__()
+
+        self.features = features
+        for key in features:
+            try:
+                features[key].requires_grad_(False)
+            except:
+                pass
+        self.args = args
+
+        binderlen=torch.nonzero((features['idx_pdb'][:,1:]-features['idx_pdb'][:,:-1])>200)[0][1].detach().item()+1
+
+        self.potential_scale = potential_scale
+        self.DEVICE = DEVICE
+        self.model=model
+        self.model.eval()
+
+        submodule_path='/'.join(__file__.split('/')[:-3])
+
+
+        import sys
+        sys.path.append(submodule_path)
+
+        from masif_martini.potential import ProteinGenerator_potential_from_bb
+
+        self.potential=ProteinGenerator_potential_from_bb(binderlen=binderlen, 
+                                                          int_weight=self.potential_scale, 
+                                                          non_int_weight=self.potential_scale, 
+                                                          threshold=3)
+
+    def get_gradients(self, seq):
+
+
+        with torch.no_grad():
+            xyz=self.predict_structure(seq)
+
+            xyz = xyz[0,:,1,:] # [L,3]
+        seq=seq.clone().detach().requires_grad_(True)
+        
+        loss=self.potential(seq, xyz)
+
+        loss.backward()  
+
+        # Get gradients from msa_masked
+        self.gradients = seq.grad
+
+        # reset gradient
+        seq.grad=None
+
+        return -self.gradients*self.potential_scale
+
+
 ### ADD NEW POTENTIALS INTO LIST DOWN BELOW ###
 POTENTIALS = {'aa_bias':AACompositionalBias, 'charge':ChargeBias, 'hydrophobic':HydrophobicBias, 'PSSM':PSSMbias, 
-              'monomer_ROG':monomer_ROG}
+              'monomer_ROG':monomer_ROG,'dmasif_interactions':dmasif_interactions}
