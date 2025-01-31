@@ -803,11 +803,10 @@ class dmasif_interactions(Potential):
 
     def get_gradients(self, seq):
 
-
         with torch.no_grad():
             xyz=self.predict_structure(seq)
+            xyz = xyz[0,:,:3,:] # [L,3,3]
 
-            xyz = xyz[0,:,1,:] # [L,3]
         seq=seq.clone().detach().requires_grad_(True)
         
         loss=self.potential(seq, xyz)
