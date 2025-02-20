@@ -800,7 +800,7 @@ class SEQDIFF_sampler:
         
         grads = torch.zeros_like(self.features['seq_out'])
         for p in self.potential_list:
-            grads += p.get_gradients(self.features['seq_out'])
+            grads += p.get_gradients(self.features['seq_out'], self.features['xyz'])
         
         self.features['seq_out'] += (grads/len(self.potential_list))
         
@@ -873,7 +873,7 @@ class SEQDIFF_sampler:
             print(''.join([self.conversion[i] for i in torch.argmax(self.features['seq_out'],dim=-1)]))
             print ("    TIMESTEP [%02d/%02d]   |   current PLDDT: %.4f   <<  >>   best PLDDT: %.4f"%(
                     self.t+1, self.args['T'], self.features['pred_lddt'].mean().item(), 
-                    self.features['best_pred_lddt'].mean().item()))
+                    self.features['best_pred_lddt'].mean().item()), flush=True)
         
         # extra pass to ensure symmetrization
         if self.features['sym'] > 1 and self.args['predict_symmetric']:

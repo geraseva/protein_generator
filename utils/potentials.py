@@ -49,7 +49,7 @@ class Potential:
                                      return_raw=True)
         return xyz
 
-    def get_gradients(seq):
+    def get_gradients(seq, xyz):
         '''
             EVERY POTENTIAL CLASS MUST RETURN GRADIENTS
         '''
@@ -159,7 +159,7 @@ class AACompositionalBias(Potential):
         else:
             sys.exit(f'You are missing an argument to use the aa_bias potential')
     
-    def get_gradients(self, seq):
+    def get_gradients(self, seq, xyz=None):
         '''
             seq = L,21 
             
@@ -602,7 +602,7 @@ class ChargeBias(Potential):
 
         return guided_charge_classification.requires_grad_()
        
-    def get_gradients(self, seq):#, guided_charge_classification):
+    def get_gradients(self, seq, xyz=None):#, guided_charge_classification):
         """
         Calculate gradients with respect to SEQUENCE CHARGE at pH.
         Uses a MSE loss.
@@ -712,7 +712,7 @@ class PSSMbias(Potential):
         self.PSSM = np.loadtxt(args['PSSM'], delimiter=",", dtype=float)
         self.PSSM = torch.from_numpy(self.PSSM).to(self.DEVICE)
 
-    def get_gradients(self, seq):
+    def get_gradients(self, seq, xyz=None):
         print(seq.shape)
 
 
@@ -744,11 +744,11 @@ class monomer_ROG(Potential):
         self.model=model
         self.model.eval()
 
-    def get_gradients(self, seq):
+    def get_gradients(self, seq, xyz=None):
 
         seq=seq.clone().detach().requires_grad_(True)
 
-        xyz=self.predict_structure(seq)
+        #xyz=self.predict_structure(seq)
 
         Ca = xyz[0,:,1,:] # [L,3]
         centroid = torch.mean(Ca, dim=0, keepdim=True) # [1,3]
@@ -801,11 +801,12 @@ class dmasif_interactions(Potential):
                                                           non_int_weight=self.potential_scale, 
                                                           threshold=3)
 
-    def get_gradients(self, seq):
+    def get_gradients(self, seq, xyz=None):
 
-        with torch.no_grad():
-            xyz=self.predict_structure(seq)
-            xyz = xyz[0,:,:3,:] # [L,3,3]
+        #with torch.no_grad():
+        #    xyz=self.predict_structure(seq)
+        
+        xyz = xyz[0,:,:3,:] # [L,3,3]
 
         seq=seq.clone().detach().requires_grad_(True)
         
