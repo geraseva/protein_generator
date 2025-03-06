@@ -799,7 +799,7 @@ class dmasif_interactions(Potential):
         self.potential=ProteinGenerator_potential_from_bb(binderlen=binderlen, 
                                                           int_weight=self.potential_scale, 
                                                           non_int_weight=self.potential_scale, 
-                                                          threshold=3)
+                                                          pos_threshold=3, neg_threshold=5)
 
     def get_gradients(self, seq, xyz=None):
 
@@ -809,6 +809,11 @@ class dmasif_interactions(Potential):
         xyz = xyz[0,:,:3,:] # [L,3,3]
 
         seq=seq.clone().detach().requires_grad_(True)
+        
+        if self.args['softmax_seqout']:
+            seq=(seq+1)/2
+        else:
+            seq=torch.softmax(seq,dim=-1)
         
         loss=self.potential(seq, xyz)
 
