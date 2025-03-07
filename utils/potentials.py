@@ -808,14 +808,14 @@ class dmasif_interactions(Potential):
         
         xyz = xyz[0,:,:3,:] # [L,3,3]
 
-        seq=seq.clone().detach().requires_grad_(True)
+        seq=seq.clone().detach().requires_grad_(True) # [L,21]
         
         if self.args['softmax_seqout']:
-            seq=(seq+1)/2
+            seq1=(seq+1)/2
         else:
-            seq=torch.softmax(seq,dim=-1)
+            seq1=torch.nn.functional.softmax(seq,dim=1)
         
-        loss=self.potential(seq, xyz)
+        loss=self.potential(seq1, xyz)
 
         loss.backward()  
 
